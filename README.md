@@ -1,36 +1,132 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Test Agent
 
-## Getting Started
+Automated code analysis and testing powered by AI
 
-First, run the development server:
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ installed
+- GitHub account
+- Supabase account (free tier)
+- Anthropic API key (for Claude AI)
+
+### Setup Instructions
+
+1. **Clone and Install**
+
+```bash
+cd ai-test-agent
+npm install
+```
+
+2. **Environment Setup**
+
+Follow the detailed instructions in [SETUP.md](./SETUP.md) to configure:
+- GitHub OAuth App
+- Supabase database
+- Anthropic API key
+- NextAuth secret
+
+3. **Run Development Server**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3050](http://localhost:3050)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🎯 Milestone 1 - Completed Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+✅ GitHub OAuth authentication  
+✅ Connect GitHub repositories  
+✅ Dashboard with project overview  
+✅ Supabase database integration  
 
-## Learn More
+### Testing Milestone 1
 
-To learn more about Next.js, take a look at the following resources:
+1. **Login Flow**
+   - Click "Login with GitHub" button
+   - Authorize the OAuth app
+   - You should be redirected back to the dashboard
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Connect Repository**
+   - Click "Connect Repository" button
+   - Enter a GitHub repository URL (e.g., `https://github.com/vercel/next.js`)
+   - Click "Connect Repository"
+   - Project should appear in your dashboard
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **View Projects**
+   - See all connected repositories on the dashboard
+   - Each project card shows:
+     - Repository name
+     - Owner/repo path
+     - Branch name
+     - Language (if detected)
+     - Date added
 
-## Deploy on Vercel
+## 🏗️ Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+ai-test-agent/
+├── app/
+│   ├── page.tsx                 # Dashboard
+│   ├── api/
+│   │   ├── auth/               # NextAuth.js routes
+│   │   ├── github/connect/     # Connect repo endpoint
+│   │   └── projects/           # Get user projects
+├── components/
+│   ├── dashboard/
+│   │   ├── project-card.tsx
+│   │   └── connect-repo-dialog.tsx
+│   ├── layout/
+│   │   └── header.tsx
+│   └── ui/                     # shadcn/ui components
+├── lib/
+│   ├── db.ts                   # Supabase client
+│   ├── github.ts               # GitHub API wrapper
+│   └── utils.ts
+└── types/
+    └── index.ts                # TypeScript types
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📚 Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Authentication**: NextAuth.js
+- **Database**: Supabase (PostgreSQL)
+- **APIs**: 
+  - GitHub API (Octokit)
+  - Anthropic Claude API
+- **State Management**: React Query + Zustand
+
+## 🔜 Coming Soon
+
+### Milestone 2: Code Analysis Engine
+- Pull repository files
+- Analyze code with Claude AI
+- Detect issues with severity classification
+- Health score calculation
+
+### Milestone 3: Auto-Fix
+- Automatic issue fixing
+- PR creation on GitHub
+- Test execution
+
+### Milestone 4: Workflow Intelligence
+- Git workflow analyzer
+- Safety checks and backup system
+- Rollback functionality
+
+### Milestone 5: Production Ready
+- i18n (Serbian/English)
+- Advanced UI features
+- Comprehensive error handling
+- Full documentation
+
+## 📝 License
+
+MIT

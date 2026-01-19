@@ -1,0 +1,15 @@
+# GitHub OAuth App
+GITHUB_CLIENT_ID=your_github_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_app_secret
+GITHUB_PERSONAL_ACCESS_TOKEN=your_pat_for_api_calls
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_KEY=your_supabase_service_key
+
+# NextAuth
+NEXTAUTH_SECRET=your_random_secret_key
+NEXTAUTH_URL=http://localhost:3050
+
+# Anthropic Claude API
+ANTHROPIC_API_KEY=your_anthropic_api_key
