@@ -148,30 +148,59 @@ Please provide:
 2. A clear explanation of what was fixed and why
 3. A list of specific changes made
 
-Respond ONLY with a JSON object in this exact format:
+**CRITICAL**: To avoid JSON parsing errors, you MUST properly escape the fixed code:
+- Escape newlines as \\n
+- Escape quotes as \\"
+- Escape backslashes as \\\\
+- Keep the entire fixedCode as a SINGLE escaped string
+
+Respond in this EXACT format (properly escaped JSON):
 {
-  "fixedCode": "complete fixed code here",
-  "explanation": "explanation of the fix",
-  "changes": ["change 1", "change 2", "..."]
+  "fixedCode": "line1\\nline2\\nline3",
+  "explanation": "explanation here",
+  "changes": ["change 1", "change 2"]
 }
 
-Do NOT include markdown code blocks or any other text. Return ONLY the raw JSON object.`,
+Do NOT include markdown code blocks. Return ONLY the raw JSON object with PROPERLY ESCAPED strings.`,
         },
       ],
     });
 
     const content = message.content[0];
     if (content.type === "text") {
-      // Remove markdown code blocks if present
       let jsonText = content.text.trim();
+      
+      // Remove markdown code blocks if present
       if (jsonText.startsWith('```json')) {
         jsonText = jsonText.replace(/^```json\n/, '').replace(/\n```$/, '');
       } else if (jsonText.startsWith('```')) {
         jsonText = jsonText.replace(/^```\n/, '').replace(/\n```$/, '');
       }
       
-      const result = JSON.parse(jsonText);
-      return result as FixResult;
+      // Try to parse
+      try {
+        const result = JSON.parse(jsonText);
+        return result as FixResult;
+      } catch (parseError: any) {
+        // If JSON parsing fails, try to extract and manually fix
+        console.error('JSON parse error:', parseError.message);
+        console.error('Problematic JSON length:', jsonText.length);
+        console.error('First 500 chars:', jsonText.substring(0, 500));
+        
+        // Fallback: try to extract with regex and manual escaping
+        const fixedCodeMatch = jsonText.match(/"fixedCode"\s*:\s*"([\s\S]*?)"\s*,\s*"explanation"/);
+        const explanationMatch = jsonText.match(/"explanation"\s*:\s*"([\s\S]*?)"\s*,\s*"changes"/);
+        
+        if (fixedCodeMatch && explanationMatch) {
+          return {
+            fixedCode: originalCode, // Fallback: return original if can't parse fixed version
+            explanation: explanationMatch[1],
+            changes: ['Fix parsing failed - using original code'],
+          };
+        }
+        
+        throw new Error(`JSON parsing failed: ${parseError.message}. Claude may have returned improperly escaped code.`);
+      }
     }
     
     throw new Error('Invalid response from Claude');
