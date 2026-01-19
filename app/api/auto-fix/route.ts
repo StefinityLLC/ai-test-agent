@@ -8,6 +8,9 @@ import { mockTestRun } from "@/lib/test-runner";
 import { supabase } from "@/lib/db";
 
 export async function POST(req: Request) {
+  let issueId: string | undefined;
+  let projectId: string | undefined;
+  
   try {
     const session = await getServerSession(authOptions);
     
@@ -18,7 +21,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const { issueId, projectId } = await req.json();
+    const body = await req.json();
+    issueId = body.issueId;
+    projectId = body.projectId;
     
     if (!issueId || !projectId) {
       return NextResponse.json(
@@ -248,13 +253,15 @@ ${fixResult.changes.map(c => `- ${c}`).join('\n')}
   } catch (error: any) {
     console.error('Error during auto-fix:', error);
     
-    // Try to update issue status to open on error
-    try {
-      const { issueId } = await req.json();
-      if (issueId) {
+    // CRITICAL: Reset issue status to 'open' on error so user can retry
+    if (issueId) {
+      try {
+        console.log(`Resetting issue ${issueId} status to 'open' due to error`);
         await updateIssue(issueId, { status: 'open' });
+      } catch (resetError) {
+        console.error('Failed to reset issue status:', resetError);
       }
-    } catch {}
+    }
     
     return NextResponse.json(
       { error: error.message || "Auto-fix failed" }, 
