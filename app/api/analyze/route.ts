@@ -197,9 +197,19 @@ export async function POST(req: Request) {
         '', // root directory
         isFirstAnalysis ? 20 : 50 // More files on re-analysis
       );
+      
+      console.log(`GitHub API returned ${files.length} files`);
+      if (files.length > 0) {
+        console.log('Sample file paths:', files.slice(0, 3).map(f => f.path));
+      }
     }
     
     if (files.length === 0) {
+      console.error('No files returned. Possible causes:');
+      console.error(`- Branch: ${project.branch}`);
+      console.error(`- Repo: ${project.repo_owner}/${project.repo_name}`);
+      console.error(`- Serverless mode: ${isServerless()}`);
+      
       return NextResponse.json(
         { error: "No code files found in repository" }, 
         { status: 400 }
