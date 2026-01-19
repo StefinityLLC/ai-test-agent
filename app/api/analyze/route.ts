@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getProject, updateProject, createIssue, getProjectIssues, updateIssue, supabase } from "@/lib/db";
-import { detectLanguage, detectFramework } from "@/lib/github";
+import { detectLanguage, detectFramework, getRepoFiles } from "@/lib/github";
 import { analyzeCode, calculateHealthScore } from "@/lib/claude";
-import { cloneRepo, pullLatestChanges, readLocalFiles, repoExists, getLocalRepoPath } from "@/lib/git-local";
+import { cloneRepo, pullLatestChanges, readLocalFiles, repoExists, getLocalRepoPath, isServerless } from "@/lib/git-local";
 
 /**
  * Generate unique issue key for tracking
@@ -131,52 +131,73 @@ export async function POST(req: Request) {
     
     console.log(`Starting analysis for ${project.repo_owner}/${project.repo_name}...`);
     
-    // OPTIMIZATION: Use local git clone
-    let repoPath: string;
-    let changedFiles: string[] | null = null;
+    // OPTIMIZATION: Use local git clone (local dev only)
+    // On serverless (Vercel), fallback to GitHub API
+    const useLocalGit = !isServerless();
+    
+    let files: Array<{ path: string; content: string; size: number }> = [];
     let isFirstAnalysis = false;
     
-    if (repoExists(projectId)) {
-      // Repo already cloned - pull latest changes
-      console.log('Repository exists locally, pulling changes...');
-      repoPath = getLocalRepoPath(projectId);
+    if (useLocalGit) {
+      console.log('Using local Git strategy...');
+      let repoPath: string;
+      let changedFiles: string[] | null = null;
       
-      const changes = await pullLatestChanges(repoPath, project.branch);
-      
-      if (changes.length === 0) {
-        return NextResponse.json({
-          success: true,
-          message: 'No changes detected since last analysis',
-          filesAnalyzed: 0,
-          issuesFound: 0,
+      if (repoExists(projectId)) {
+        // Repo already cloned - pull latest changes
+        console.log('Repository exists locally, pulling changes...');
+        repoPath = getLocalRepoPath(projectId);
+        
+        const changes = await pullLatestChanges(repoPath, project.branch);
+        
+        if (changes.length === 0) {
+          return NextResponse.json({
+            success: true,
+            message: 'No changes detected since last analysis',
+            filesAnalyzed: 0,
+            issuesFound: 0,
+          });
+        }
+        
+        changedFiles = changes
+          .filter(f => f.status !== 'deleted')
+          .map(f => f.path);
+          
+        console.log(`Detected ${changedFiles.length} changed files`);
+      } else {
+        // First time - clone the repo
+        console.log('Cloning repository for the first time...');
+        isFirstAnalysis = true;
+        
+        repoPath = await cloneRepo(
+          project.github_repo_url,
+          projectId,
+          project.branch,
+          session.accessToken
+        );
+        
+        // Save local repo path to DB
+        await updateProject(projectId, {
+          local_repo_path: repoPath,
         });
       }
       
-      changedFiles = changes
-        .filter(f => f.status !== 'deleted')
-        .map(f => f.path);
-        
-      console.log(`Detected ${changedFiles.length} changed files`);
+      // Read files from local disk (0 API calls!)
+      files = await readLocalFiles(repoPath, changedFiles || undefined);
     } else {
-      // First time - clone the repo
-      console.log('Cloning repository for the first time...');
-      isFirstAnalysis = true;
+      // Serverless fallback: Use GitHub API
+      console.log('Using GitHub API strategy (serverless mode)...');
+      isFirstAnalysis = !project.last_analyzed;
       
-      repoPath = await cloneRepo(
-        project.github_repo_url,
-        projectId,
+      files = await getRepoFiles(
+        project.repo_owner,
+        project.repo_name,
         project.branch,
-        session.accessToken
+        session.accessToken,
+        '', // root directory
+        isFirstAnalysis ? 20 : 50 // More files on re-analysis
       );
-      
-      // Save local repo path to DB
-      await updateProject(projectId, {
-        local_repo_path: repoPath,
-      });
     }
-    
-    // Step 1: Read files (from local disk - 0 API calls!)
-    const files = await readLocalFiles(repoPath, changedFiles || undefined);
     
     if (files.length === 0) {
       return NextResponse.json(
@@ -192,9 +213,15 @@ export async function POST(req: Request) {
     let detectedFramework = project.framework;
     
     if (isFirstAnalysis) {
-      const allFiles = await readLocalFiles(repoPath);
-      detectedLanguage = detectLanguage(allFiles as any) || undefined;
-      detectedFramework = detectFramework(allFiles as any) || undefined;
+      if (useLocalGit) {
+        const repoPath = getLocalRepoPath(projectId);
+        const allFiles = await readLocalFiles(repoPath);
+        detectedLanguage = detectLanguage(allFiles as any) || undefined;
+        detectedFramework = detectFramework(allFiles as any) || undefined;
+      } else {
+        detectedLanguage = detectLanguage(files as any) || undefined;
+        detectedFramework = detectFramework(files as any) || undefined;
+      }
       console.log(`Detected: ${detectedLanguage} / ${detectedFramework}`);
     }
     

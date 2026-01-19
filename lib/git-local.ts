@@ -10,7 +10,17 @@ import { existsSync } from 'fs';
 const execAsync = promisify(exec);
 
 // Base directory for cloned repos
-const REPOS_BASE_DIR = path.join(process.cwd(), '.ai-test-agent', 'repos');
+// Use /tmp on serverless environments (Vercel), otherwise use local .ai-test-agent
+const REPOS_BASE_DIR = process.env.VERCEL 
+  ? '/tmp/ai-test-agent-repos' 
+  : path.join(process.cwd(), '.ai-test-agent', 'repos');
+
+/**
+ * Check if we're running in a serverless environment (Vercel)
+ */
+export function isServerless(): boolean {
+  return !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+}
 
 export interface LocalRepoInfo {
   path: string;
