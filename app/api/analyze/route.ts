@@ -193,8 +193,8 @@ export async function POST(req: Request) {
     
     if (isFirstAnalysis) {
       const allFiles = await readLocalFiles(repoPath);
-      detectedLanguage = detectLanguage(allFiles as any);
-      detectedFramework = detectFramework(allFiles as any);
+      detectedLanguage = detectLanguage(allFiles as any) || undefined;
+      detectedFramework = detectFramework(allFiles as any) || undefined;
       console.log(`Detected: ${detectedLanguage} / ${detectedFramework}`);
     }
     
