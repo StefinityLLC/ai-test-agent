@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getProject, updateProject, createIssue, getProjectIssues, updateIssue, supabase } from "@/lib/db";
 import { detectLanguage, detectFramework, getRepoFiles } from "@/lib/github";
+import { checkRateLimit, formatTimeUntilReset } from "@/lib/github-rate-limit";
 import { analyzeCode, calculateHealthScore } from "@/lib/claude";
 import { cloneRepo, pullLatestChanges, readLocalFiles, repoExists, getLocalRepoPath, isServerless } from "@/lib/git-local";
 
@@ -134,6 +135,25 @@ export async function POST(req: Request) {
     // OPTIMIZATION: Use local git clone (local dev only)
     // On serverless (Vercel), fallback to GitHub API
     const useLocalGit = !isServerless();
+    
+    // Check rate limit if using GitHub API
+    if (!useLocalGit) {
+      const rateLimit = await checkRateLimit(session.accessToken);
+      
+      if (rateLimit.remaining < 50) {
+        const timeUntil = formatTimeUntilReset(rateLimit.reset);
+        return NextResponse.json(
+          { 
+            error: `GitHub API rate limit exceeded (${rateLimit.remaining}/${rateLimit.limit} remaining). Please try again in ${timeUntil}.`,
+            rateLimitReset: rateLimit.reset.toISOString(),
+            rateLimitRemaining: rateLimit.remaining,
+          }, 
+          { status: 429 }
+        );
+      }
+      
+      console.log(`Rate limit OK: ${rateLimit.remaining}/${rateLimit.limit} calls remaining`);
+    }
     
     let files: Array<{ path: string; content: string; size: number }> = [];
     let isFirstAnalysis = false;
