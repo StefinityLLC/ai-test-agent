@@ -13,7 +13,7 @@ export interface PRDiff {
 }
 
 export interface CIStatus {
-  conclusion: 'success' | 'failure' | 'pending' | 'cancelled' | 'skipped';
+  conclusion: 'success' | 'failure' | 'pending' | 'cancelled' | 'skipped' | 'neutral';
   name: string;
   details?: string;
 }
