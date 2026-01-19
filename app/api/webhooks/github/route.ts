@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { reviewPRWithAI, formatReviewComment } from '@/lib/ai-reviewer';
 import { getPRDiff, commentOnPR, mergePR, closePR, getPRInfo } from '@/lib/github';
+import { getPRCIStatus, getPRComments, getPRHeadSHA } from '@/lib/github-ci';
 import { getProject, getIssue, getAIReviewSettings, createPRReview, updateIssue } from '@/lib/db';
 
 /**
@@ -92,7 +93,23 @@ export async function POST(req: Request) {
       // Fetch PR diff
       const prDiff = await getPRDiff(repo.owner.login, repo.name, pr.number);
 
-      // Perform AI Code Review
+      // Fetch CI/CD status
+      console.log('📊 Fetching CI/CD status...');
+      const headSHA = pr.head.sha;
+      const ciStatus = await getPRCIStatus(repo.owner.login, repo.name, headSHA);
+      console.log(`CI Status: ${ciStatus.length} checks found`);
+      ciStatus.forEach(ci => console.log(`  - ${ci.name}: ${ci.conclusion}`));
+
+      // Fetch PR comments (including bot comments like SonarQube, linters, etc.)
+      console.log('💬 Fetching PR comments...');
+      const comments = await getPRComments(repo.owner.login, repo.name, pr.number);
+      const botComments = comments.filter(c => c.isBot);
+      console.log(`Comments: ${comments.length} total, ${botComments.length} from bots`);
+      if (botComments.length > 0) {
+        botComments.forEach(c => console.log(`  - ${c.author}: ${c.body.substring(0, 100)}...`));
+      }
+
+      // Perform AI Code Review with CI status and comments
       console.log('🧠 Running AI code review...');
       const reviewResult = await reviewPRWithAI(
         prDiff,
@@ -101,7 +118,10 @@ export async function POST(req: Request) {
           description: issue.description,
           severity: issue.severity,
           filePath: issue.file_path,
-        }
+        },
+        undefined, // testResults - not available at this point
+        ciStatus.length > 0 ? ciStatus : undefined,
+        comments.length > 0 ? comments : undefined
       );
 
       console.log(`AI Review Result: ${reviewResult.recommendation} (Confidence: ${reviewResult.confidence}%)`);

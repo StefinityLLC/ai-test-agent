@@ -12,6 +12,18 @@ export interface PRDiff {
   changes: string;
 }
 
+export interface CIStatus {
+  conclusion: 'success' | 'failure' | 'pending' | 'cancelled' | 'skipped';
+  name: string;
+  details?: string;
+}
+
+export interface PRComment {
+  author: string;
+  body: string;
+  isBot: boolean;
+}
+
 /**
  * AI Code Review - Analyzes PR changes and provides comprehensive review
  */
@@ -27,7 +39,9 @@ export async function reviewPRWithAI(
     totalTests: number;
     passed: number;
     failed: number;
-  }
+  },
+  ciStatus?: CIStatus[],
+  comments?: PRComment[]
 ): Promise<AIReviewResult> {
   try {
     const message = await anthropic.messages.create({
@@ -55,6 +69,18 @@ ${testResults ? `**Test Results:**
 - Failed: ${testResults.failed}
 ` : ''}
 
+${ciStatus && ciStatus.length > 0 ? `**CI/CD Status:**
+${ciStatus.map(ci => `- ${ci.name}: ${ci.conclusion.toUpperCase()}${ci.details ? ` (${ci.details})` : ''}`).join('\n')}
+
+⚠️ **CRITICAL**: If ANY CI check has failed, you MUST set recommendation to "REJECT" or "REQUEST_CHANGES" and lower confidence significantly.
+` : ''}
+
+${comments && comments.length > 0 ? `**Comments from Bots & Reviewers:**
+${comments.map(c => `- ${c.author}${c.isBot ? ' (Bot)' : ''}: ${c.body}`).join('\n')}
+
+**Important**: Pay special attention to bot comments (SonarQube, linters, security scanners). If they flag issues, factor that into your review.
+` : ''}
+
 **Your Task:**
 Perform a comprehensive code review and analyze:
 
@@ -64,12 +90,14 @@ Perform a comprehensive code review and analyze:
 4. **Performance Impact**: Does this change affect performance positively or negatively?
 5. **Breaking Changes**: Could this break existing functionality?
 6. **Test Coverage**: Are the tests sufficient? (if test results provided)
-7. **Best Practices**: Does it follow language/framework best practices?
+7. **CI/CD Status**: Are all CI checks passing? (CRITICAL - must pass for MERGE)
+8. **Bot & Reviewer Feedback**: Address concerns raised in comments
+9. **Best Practices**: Does it follow language/framework best practices?
 
 **Decision Criteria:**
-- **MERGE**: Fix is correct, safe, and high quality (confidence > 80%)
-- **REQUEST_CHANGES**: Fix has minor issues or concerns (confidence 50-80%)
-- **REJECT**: Fix introduces bugs, security issues, or doesn't solve the problem (confidence < 50%)
+- **MERGE**: Fix is correct, safe, high quality, AND all CI checks pass (confidence > 80%)
+- **REQUEST_CHANGES**: Fix has minor issues, concerns from bots, or some CI checks failing (confidence 50-80%)
+- **REJECT**: Fix introduces bugs, security issues, CI completely failed, or doesn't solve the problem (confidence < 50%)
 
 Respond ONLY with a JSON object in this exact format:
 {
